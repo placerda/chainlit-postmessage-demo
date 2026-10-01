@@ -18,7 +18,7 @@
 <header>
   <strong>Contoso Store (host page simulation) - {{ request.host }}</strong>
   {% if user %}
-  <form method="post" action="/logout"><button>Logout</button></form>
+  <form id="logout" method="post" action="/logout"><button>Logout</button></form>
   {% endif %}
 </header>
 
@@ -73,6 +73,14 @@
     }, 2000);
   }
 
+  // Tell the chat the shopper signed out before the host session is cleared.
+  document.getElementById("logout").addEventListener("submit", (e) => {
+    e.preventDefault();
+    iframe.contentWindow.postMessage({ type: "contoso-logout" }, EMBEDDED_ORIGIN);
+    log("postMessage contoso-logout sent");
+    setTimeout(() => e.target.submit(), 500);
+  });
+
   iframe.addEventListener("load", () => { authenticated = false; startRetries(); });
 
   window.addEventListener("message", (event) => {
@@ -88,7 +96,7 @@
     } else if (data && data.type === "contoso-auth-ok") {
       authenticated = true;
       clearInterval(retryTimer);
-      log("handshake complete for " + data.user);
+      log("handshake complete");
     }
   });
 </script>

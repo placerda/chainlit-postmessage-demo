@@ -8,11 +8,23 @@ Flow:
 4. The validated user context (bill-to, ship-to) is stored in the Chainlit user session.
 """
 import os
+from urllib.parse import urlparse
 
 import chainlit as cl
 import httpx
+from chainlit.server import app as fastapi_app
 
 HOST_URL = os.environ.get("HOST_URL", "http://localhost:5000").rstrip("/")
+_host = urlparse(HOST_URL)
+ALLOWED_PARENT_ORIGIN = os.environ.get("ALLOWED_PARENT_ORIGIN", f"{_host.scheme}://{_host.netloc}")
+
+
+@fastapi_app.middleware("http")
+async def frame_ancestors(request, call_next):
+    # Only the host page origin may embed this app in an iframe.
+    response = await call_next(request)
+    response.headers["Content-Security-Policy"] = f"frame-ancestors {ALLOWED_PARENT_ORIGIN}"
+    return response
 
 
 @cl.on_chat_start
@@ -26,12 +38,20 @@ async def start():
 async def window_message(data):
     # Chainlit does not check the sender origin, so never trust the payload itself:
     # the token is only accepted after the host backend validates it.
-    if not isinstance(data, dict) or data.get("type") != "contoso-auth" or not data.get("token"):
+    if not isinstance(data, dict):
+        return
+    if data.get("type") == "contoso-logout":
+        # The host signed the shopper out: drop the identity from this chat session.
+        if cl.user_session.get("user"):
+            cl.user_session.set("user", None)
+            await cl.Message(content="Session ended on the host page. Sign in again to continue.").send()
+        return
+    if data.get("type") != "contoso-auth" or not data.get("token"):
         return
     # The host retries until it gets an ack, so duplicates are expected: just re-ack.
     current = cl.user_session.get("user")
     if current:
-        await cl.send_window_message({"type": "contoso-auth-ok", "user": current["userName"]})
+        await cl.send_window_message({"type": "contoso-auth-ok"})
         return
     try:
         async with httpx.AsyncClient(timeout=10) as client:
@@ -55,7 +75,7 @@ async def window_message(data):
             f"Bill-to: `{user['billTo']}` | Ship-to: `{user['shipTo']}`"
         )
     ).send()
-    await cl.send_window_message({"type": "contoso-auth-ok", "user": user["userName"]})
+    await cl.send_window_message({"type": "contoso-auth-ok"})
 
 
 @cl.on_message

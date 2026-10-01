@@ -57,7 +57,12 @@ Chainlit receives the message in `@cl.on_window_message` and calls `GET {HOST_UR
 
 ### 6. User context available
 
-The response (user name, email, billTo, shipTo) is stored in `cl.user_session` and used to answer questions. The embedded page sends `contoso-auth-ok` back to the host.
+The response (user name, email, billTo, shipTo) is stored in `cl.user_session` and used to answer questions. The embedded page sends `contoso-auth-ok` back to the host, with no user data in it.
+
+Additional hardening in `embedded/app.py` and `host/templates/index.html`:
+
+- The embedded app returns `Content-Security-Policy: frame-ancestors <host URL>`, so only the host can frame the chat.
+- On Logout, the host posts `{type: "contoso-logout"}` to the iframe before submitting; the embedded page clears the user from the Chainlit session.
 
 - Store user in the Chainlit session: [embedded/app.py L50-L57](https://github.com/placerda/chainlit-postmessage-demo/blob/3b92651d4db34a44f99146f6f79ff3194cb1b883/embedded/app.py#L50-L57)
 - Send `contoso-auth-ok` to the host: [embedded/app.py L58](https://github.com/placerda/chainlit-postmessage-demo/blob/3b92651d4db34a44f99146f6f79ff3194cb1b883/embedded/app.py#L58)
