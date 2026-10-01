@@ -3,7 +3,8 @@ __pycache__/
 .venv/
 venv/
 .env
-.chainlit/
+.chainlit/*
+!.chainlit/config.toml
 .files/
 .azure/
 *.zip

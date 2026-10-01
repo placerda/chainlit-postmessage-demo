@@ -52,21 +52,62 @@
   const iframe = document.getElementById("chat");
   const log = (m) => { document.getElementById("log").textContent += new Date().toLocaleTimeString() + " " + m + "\n"; };
 
-  window.addEventListener("message", async (event) => {
-    // 1. Accept messages only from the embedded app origin and from our iframe.
-    if (event.origin !== EMBEDDED_ORIGIN || event.source !== iframe.contentWindow) return;
+  let authenticated = false;
+  let tokenPromise = null;
+  let retryTimer = null;
+
+  // Exchange the HttpOnly session cookie for a short-lived token (same-origin call).
+  function getToken() {
+    if (!tokenPromise) {
+      tokenPromise = fetch("/api/v1/widget-token", { credentials: "same-origin" }).then(async (resp) => {
+        if (!resp.ok) { tokenPromise = null; throw new Error("widget-token failed: " + resp.status); }
+        const { token } = await resp.json();
+        log("got widget token (" + token.slice(0, 16) + "...)");
+        return token;
+      });
+    }
+    return tokenPromise;
+  }
+
+  // Send the token to the iframe, restricted to the embedded origin.
+  async function sendToken(reason) {
+    if (authenticated) return;
+    try {
+      const token = await getToken();
+      iframe.contentWindow.postMessage({ type: "contoso-auth", token }, EMBEDDED_ORIGIN);
+      log("postMessage contoso-auth sent (" + reason + ")");
+    } catch (err) { log(String(err)); }
+  }
+
+  // The chat UI may not be listening yet when the iframe loads (websocket still connecting),
+  // so keep resending every 2s until the iframe acknowledges, up to 15 attempts.
+  function startRetries() {
+    clearInterval(retryTimer);
+    let attempts = 0;
+    retryTimer = setInterval(() => {
+      if (authenticated || ++attempts > 15) { clearInterval(retryTimer); return; }
+      sendToken("retry " + attempts);
+    }, 2000);
+  }
+
+  iframe.addEventListener("load", () => { authenticated = false; tokenPromise = null; startRetries(); });
+
+  window.addEventListener("message", (event) => {
+    // Accept messages only from the embedded app origin.
+    if (event.origin !== EMBEDDED_ORIGIN) return;
     log("received from iframe: " + JSON.stringify(event.data));
-    if (event.data !== "ready") return;
-
-    // 2. Exchange the HttpOnly session cookie for a short-lived token (same-origin call).
-    const resp = await fetch("/api/v1/widget-token", { credentials: "same-origin" });
-    if (!resp.ok) { log("widget-token failed: " + resp.status); return; }
-    const { token } = await resp.json();
-    log("got widget token (" + token.slice(0, 16) + "...)");
-
-    // 3. Send the token to the iframe, restricted to the embedded origin.
-    iframe.contentWindow.postMessage({ type: "contoso-auth", token }, EMBEDDED_ORIGIN);
-    log("postMessage contoso-auth sent to " + EMBEDDED_ORIGIN);
+    const data = event.data;
+    if (data === "ready" || (data && data.type === "ready")) {
+      // A new chat (e.g. "New chat" button) also sends "ready" and needs the token again.
+      authenticated = false;
+      tokenPromise = null;
+      sendToken("ready");
+      startRetries();
+    } else if (data && data.type === "contoso-auth-ok") {
+      authenticated = true;
+      clearInterval(retryTimer);
+      log("handshake complete for " + data.user);
+    }
   });
 </script>
 {% endif %}

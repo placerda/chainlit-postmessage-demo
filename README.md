@@ -20,7 +20,7 @@ Each one has its own public domain, so the browser treats them as different orig
 5. **Embedded validates server side.** Chainlit receives the message in `@cl.on_window_message` and calls `GET {HOST_URL}/api/v1/sessions/current` with `Authorization: Bearer <token>`. This is a server to server call, so browser CORS does not apply.
 6. **User context available.** The response (user name, email, billTo, shipTo) is stored in `cl.user_session` and used to answer questions. The embedded page sends `contoso-auth-ok` back to the host.
 
-References: [HTML Standard: Web messaging](https://html.spec.whatwg.org/multipage/web-messaging.html#web-messaging), [MDN postMessage](https://developer.mozilla.org/en-US/docs/Web/API/Window/postMessage), [Chainlit window messaging](https://docs.chainlit.io/api-reference/window-message).
+References: [Code walkthrough](CODE_WALKTHROUGH.md), [HTML Standard: Web messaging](https://html.spec.whatwg.org/multipage/web-messaging.html#web-messaging), [MDN postMessage](https://developer.mozilla.org/en-US/docs/Web/API/Window/postMessage), [Chainlit window messaging](https://docs.chainlit.io/api-reference/window-message).
 
 ## Run locally
 

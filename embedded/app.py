@@ -28,6 +28,11 @@ async def window_message(data):
     # the token is only accepted after the host backend validates it.
     if not isinstance(data, dict) or data.get("type") != "contoso-auth" or not data.get("token"):
         return
+    # The host retries until it gets an ack, so duplicates are expected: just re-ack.
+    current = cl.user_session.get("user")
+    if current:
+        await cl.send_window_message({"type": "contoso-auth-ok", "user": current["userName"]})
+        return
     try:
         async with httpx.AsyncClient(timeout=10) as client:
             resp = await client.get(
