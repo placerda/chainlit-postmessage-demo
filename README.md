@@ -70,7 +70,7 @@ Clean up: `az group delete -n rg-postmessage-demo`.
 
 The demo keeps things simple. For production, these standard iframe practices are recommended:
 
-| Practice | Store team (host page) | Chat team (chat app) |
+| Practice | Host page | Chat app |
 |---|---|---|
 | **Send the token only to the chat** | Send it after the chat says "ready", with the chat address as target: `postMessage(token, "https://<chat-domain>")`. | Accept it only from store domains (check `event.origin`). Send back status signals only, such as "ready" or "auth-ok". |
 | **Confirm the user with the store** | Confirm the session API contract (TBC). | From the backend, call `GET /api/v1/sessions/current` with the token and use the user, billTo and shipTo it returns. If it fails or expires, show the sign-in prompt. |
