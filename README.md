@@ -68,21 +68,20 @@ Clean up: `az group delete -n rg-postmessage-demo`.
 
 ## Production recommendations
 
-This demo is intentionally simplified. For production:
+The demo keeps things simple. These are standard practices for iframe integrations, listed with the team responsible for each one:
 
-- **Send the token only to the chat, and accept it only from the store.** postMessage just carries the token; it does not prove who sent it. See [MDN: postMessage security](https://developer.mozilla.org/en-US/docs/Web/API/Window/postMessage#security_concerns).
-  - *Host page:* call `postMessage(token, "https://<chat-domain>")` with the chat URL, never `"*"`, so the browser delivers the token only if the iframe is really the chat.
-  - *Embedded page:* ignore any message whose `event.origin` is not one of the store domains.
-  - *Embedded page:* never send the token or user data back to the parent, because Chainlit 2.9.x posts its own messages with `"*"` (any page could read them).
-- **Validate on the server and fail closed.** The browser can be tampered with, so identity must come from the store, not from the message.
-  - *Embedded backend:* call `GET /api/v1/sessions/current` server-to-server with the token (contract TBC) and take the user, billTo and shipTo only from that response.
-    - *Embedded backend:* if the call fails or the token is invalid, deny access.
-- **Restrict who can frame the chat.** CSP (Content Security Policy) is an HTTP response header that tells the browser what a page may load or who may embed it. Its [`frame-ancestors`](https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Content-Security-Policy/frame-ancestors) directive lists the sites allowed to show the page in an iframe; the browser blocks all others.
-  - *Embedded app:* return `Content-Security-Policy: frame-ancestors https://<store-domain>` on its responses (for example, via app middleware or the ingress/gateway).
-  - *Host page:* no change needed.
-- **Propagate logout and expiry.** The chat session should end when the store session ends.
-  - *Host page:* when the store session ends, post a logout message to the iframe.
-    - *Embedded page:* clear the chat session on that message or when token validation fails.
+- **Address messages to the right site.** postMessage lets the sender name the recipient, and the receiver check the sender. See [MDN: postMessage](https://developer.mozilla.org/en-US/docs/Web/API/Window/postMessage#security_concerns).
+  - *Host page (Store team):* send the token with the chat address as the target, for example `postMessage(token, "https://<chat-domain>")`.
+  - *Embedded page (Chat team):* accept messages only when `event.origin` is a store domain.
+  - *Embedded page (Chat team):* reply to the store with simple status signals such as "ready" or "auth-ok", not with the token or user data. Chainlit's `send_window_message` does not set a specific target site, so status signals are the right fit for it.
+- **Let the store confirm who the user is.** The chat asks the store's backend, so user data always comes from the store itself.
+  - *Embedded backend (Chat team):* call `GET /api/v1/sessions/current` server-to-server with the token (contract TBC) and read the user, billTo and shipTo from that response. If the call does not succeed, show the sign-in prompt.
+- **Choose which sites can show the chat.** CSP (Content Security Policy) is an HTTP response header that tells the browser how a page may be used. Its [`frame-ancestors`](https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Content-Security-Policy/frame-ancestors) setting lists the sites allowed to display the page in an iframe.
+  - *Embedded app (Chat team):* return `Content-Security-Policy: frame-ancestors https://<store-domain>` (for example, via app middleware or the ingress/gateway).
+  - *Host page (Store team):* no change needed.
+- **Keep sign-out in sync.** When the user signs out of the store, the chat signs out too.
+  - *Host page (Store team):* post a logout message to the iframe.
+  - *Embedded page (Chat team):* clear the chat session on that message.
 
 ## Deployed instance (demo)
 
