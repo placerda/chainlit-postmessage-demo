@@ -74,10 +74,15 @@ This demo is intentionally simplified. For production:
   - *Host page:* call `postMessage(token, "https://<chat-domain>")` with the chat URL, never `"*"`, so the browser delivers the token only if the iframe is really the chat.
   - *Embedded page:* ignore any message whose `event.origin` is not one of the store domains.
   - *Embedded page:* never send the token or user data back to the parent, because Chainlit 2.9.x posts its own messages with `"*"` (any page could read them).
-- **Validate on the server and fail closed.** *Embedded backend:* call `GET /api/v1/sessions/current` server-to-server with the token (contract TBC) and take the user, billTo and shipTo only from that response. If the call fails, deny access.
+- **Validate on the server and fail closed.** The browser can be tampered with, so identity must come from the store, not from the message.
+  - *Embedded backend:* call `GET /api/v1/sessions/current` server-to-server with the token (contract TBC) and take the user, billTo and shipTo only from that response.
+  - *Embedded backend:* if the call fails or the token is invalid, deny access.
 - **Restrict who can frame the chat.** CSP (Content Security Policy) is an HTTP response header that tells the browser what a page may load or who may embed it. Its [`frame-ancestors`](https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Content-Security-Policy/frame-ancestors) directive lists the sites allowed to show the page in an iframe; the browser blocks all others.
-  - *Embedded app:* return `Content-Security-Policy: frame-ancestors https://<store-domain>` on its responses (for example, via app middleware or the ingress/gateway). Nothing changes on the host page.
-- **Propagate logout and expiry.** *Host page:* when the store session ends, post a logout message to the iframe. *Embedded page:* clear the chat session on that message or when token validation fails.
+  - *Embedded app:* return `Content-Security-Policy: frame-ancestors https://<store-domain>` on its responses (for example, via app middleware or the ingress/gateway).
+  - *Host page:* no change needed.
+- **Propagate logout and expiry.** The chat session should end when the store session ends.
+  - *Host page:* when the store session ends, post a logout message to the iframe.
+  - *Embedded page:* clear the chat session on that message or when token validation fails.
 
 ## Deployed instance (demo)
 
