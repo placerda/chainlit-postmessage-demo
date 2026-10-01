@@ -12,11 +12,6 @@
     iframe { width: 460px; height: 640px; border: 2px dashed #e67700; border-radius: 8px; background: #fff; }
     #log { font-family: Consolas, monospace; font-size: 12px; white-space: pre-wrap; background: #111; color: #9f9; padding: 8px; border-radius: 4px; max-height: 260px; overflow: auto; }
     button { cursor: pointer; }
-    .prod { margin: 0 24px 24px; max-width: 1100px; font-size: 14px; }
-    .prod summary { cursor: pointer; font-size: 16px; }
-    .prod h4 { margin: 16px 0 4px; color: #003a70; }
-    .prod ul { margin: 4px 0; }
-    .prod li { margin: 3px 0; }
   </style>
 </head>
 <body>
@@ -117,60 +112,5 @@
 </script>
 {% endif %}
 
-<section class="card prod">
-  <details>
-    <summary><b>Production recommendations</b> (what this demo simplifies)</summary>
-
-    <h4>1. Credential passed to the iframe</h4>
-    <ul>
-      <li>Do not forward the store session cookie. Issue a dedicated widget token from a same-origin backend call.</li>
-      <li>Use a signed JWT with a short expiry (about 60 seconds), an audience bound to the embedded app (<code>aud</code>), the issuer (<code>iss</code>), and a one-time ID (<code>jti</code>) to block replay.</li>
-      <li>Keep the token in memory only. Never put it in the iframe URL, query string, localStorage, or logs.</li>
-      <li>Rotate signing keys and publish them through a JWKS endpoint so the embedded backend can verify signatures without shared secrets.</li>
-    </ul>
-
-    <h4>2. postMessage hardening</h4>
-    <ul>
-      <li>postMessage is a transport, not authentication. Trust comes only from validating the token on the server.</li>
-      <li>Host: always send with an explicit <code>targetOrigin</code> (never <code>"*"</code>) and accept replies only from the embedded origin.</li>
-      <li>Embedded app: check <code>event.origin</code> against an allowlist of store domains per environment (dev, test, prod).</li>
-      <li>Use a versioned message schema (<code>type</code>, <code>version</code>, payload) and ignore anything else.</li>
-      <li>Do not send sensitive data back to the parent. Chainlit 2.9.x replies with target <code>"*"</code>.</li>
-    </ul>
-
-    <h4>3. Server-side session validation</h4>
-    <ul>
-      <li>The embedded backend validates the credential with the commerce platform (<code>GET /api/v1/sessions/current</code>) before using any identity data. The real contract is TBC: accepted credential, returned fields, billTo and shipTo shape.</li>
-      <li>Secure the server-to-server call with managed identity, an API key in Key Vault, or mTLS.</li>
-      <li>Derive authorization (billTo, shipTo, entitlements) from the validated response, never from values sent by the browser.</li>
-      <li>Cache the validation result for the token lifetime only, and fail closed on errors or timeouts.</li>
-    </ul>
-
-    <h4>4. Session inside the iframe</h4>
-    <ul>
-      <li>Cookies set by the embedded app are third-party cookies. Use <code>Secure; HttpOnly; SameSite=None; Partitioned</code> (CHIPS), or keep the session token in memory and resend it after reloads.</li>
-      <li>Test Safari, Firefox, and Chrome with third-party cookie restrictions enabled.</li>
-      <li>Tie Chainlit threads and history to the validated user (header or custom auth), not only to <code>cl.user_session</code>.</li>
-      <li>Propagate logout and session expiry from the host to the chat, and clear chat state on user change.</li>
-    </ul>
-
-    <h4>5. Framing and browser policy</h4>
-    <ul>
-      <li>Embedded app: <code>Content-Security-Policy: frame-ancestors https://store.contoso.com</code> so only the store can frame it.</li>
-      <li>Host: <code>frame-src</code> limited to the embedded origin, plus a strict <code>script-src</code>.</li>
-      <li>Use the iframe <code>sandbox</code> and <code>allow</code> attributes to grant only what the chat needs.</li>
-    </ul>
-
-    <h4>6. Platform and operations</h4>
-    <ul>
-      <li>Secrets and signing keys in Azure Key Vault, accessed with managed identity.</li>
-      <li>Azure Front Door with WAF in front of both apps, custom domains, TLS only.</li>
-      <li>Private endpoints or network isolation for the backend, search, and model services (as in GPT-RAG zero trust).</li>
-      <li>Rate limiting on the token and chat endpoints.</li>
-      <li>Application Insights with correlation IDs across host, iframe, and backend. Log handshake failures without logging tokens.</li>
-      <li>Health probes, autoscale rules, and separate environments with their own origin allowlists.</li>
-    </ul>
-  </details>
-</section>
 </body>
 </html>

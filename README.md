@@ -66,19 +66,17 @@ az containerapp update -n ca-embedded-chat -g rg-postmessage-demo `
 
 Clean up: `az group delete -n rg-postmessage-demo`.
 
-## What this demo simplifies (production items)
+## Production recommendations
 
-The host main page has a collapsible **Production recommendations** section with the full list (credential design, postMessage hardening, server-side validation, iframe session, framing policy, platform and operations). Summary:
+This demo is intentionally simplified. For production:
 
-- **postMessage is a transport, not authentication.** Anything can post a message to the iframe. Trust comes only from validating the token on the server.
-- **Origin checks.** The host checks `event.origin`. Chainlit 2.9.x forwards any window message without an origin check and replies with target `"*"`, so do not send sensitive data back to the parent.
-- **Real contract TBC.** The real `GET /api/v1/sessions/current` contract on the commerce platform (which credential it accepts, which fields it returns, billTo/shipTo shape) still needs confirmation.
-- **Token design.** Prefer a short-lived, audience-bound token instead of reusing the store session cookie. An HttpOnly cookie cannot be read by JavaScript, so it cannot be forwarded through postMessage.
-- **Chainlit auth.** Here the identity lives only in `cl.user_session`. In production, consider Chainlit header or custom auth so threads and history are tied to the user.
-- **Third-party cookies.** Inside an iframe the Chainlit cookies are third-party and may be blocked by some browsers. Test Safari and Chrome with restrictions.
-- **Framing policy.** Use CSP `frame-ancestors` on the embedded app to allow only the store domain.
-- **Logout and session expiry.** Propagate logout and token expiry from the host to the embedded chat.
-
+- **Use a dedicated short-lived token.** Issue a signed JWT with `aud`, `iss`, `exp` and `jti` instead of forwarding the store session cookie, and keep it in memory only (never in the URL). See [RFC 7519](https://datatracker.ietf.org/doc/html/rfc7519) and [JWT best practices (RFC 8725)](https://datatracker.ietf.org/doc/html/rfc8725).
+- **Treat postMessage as transport, not authentication.** Always set an explicit `targetOrigin`, check `event.origin` against an allowlist, and do not send sensitive data back to the parent (Chainlit 2.9.x replies with `"*"`). See [MDN: postMessage security](https://developer.mozilla.org/en-US/docs/Web/API/Window/postMessage#security_concerns).
+- **Validate on the server and fail closed.** The backend calls `GET /api/v1/sessions/current` server-to-server (contract TBC) and derives the user, billTo and shipTo only from that response.
+- **Plan for third-party cookies in the iframe.** Use [partitioned cookies (CHIPS)](https://developer.mozilla.org/en-US/docs/Web/Privacy/Privacy_sandbox/Partitioned_cookies) or an in-memory token, and test Safari, Firefox and Chrome. Tie Chainlit threads to the validated user with [Chainlit authentication](https://docs.chainlit.io/authentication/overview).
+- **Restrict who can frame the chat.** Set CSP [`frame-ancestors`](https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Content-Security-Policy/frame-ancestors) on the embedded app to the store domains only.
+- **Propagate logout and expiry.** When the store session ends, the host notifies the chat, which clears its session.
+- **Harden the platform.** Store secrets in [Key Vault](https://learn.microsoft.com/azure/key-vault/general/overview), add [Front Door WAF](https://learn.microsoft.com/azure/frontdoor/web-application-firewall) and [private endpoints](https://learn.microsoft.com/azure/private-link/private-endpoint-overview), and monitor with [Application Insights](https://learn.microsoft.com/azure/azure-monitor/app/app-insights-overview) (never log tokens).
 ## Deployed instance (demo)
 
 - Host (App Service, B1, centralus): https://app-host-pm-3955.azurewebsites.net
