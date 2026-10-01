@@ -32,7 +32,6 @@
       </select>
       <button>Login</button>
     </form>
-    <p>The session is stored in an HttpOnly cookie on this domain.</p>
   </div>
 </main>
 {% else %}
@@ -49,34 +48,18 @@
 
 <script>
   const EMBEDDED_ORIGIN = {{ embedded_origin | tojson }};
+  const SESSION_TOKEN = {{ session_token | tojson }};
   const iframe = document.getElementById("chat");
   const log = (m) => { document.getElementById("log").textContent += new Date().toLocaleTimeString() + " " + m + "\n"; };
 
   let authenticated = false;
-  let tokenPromise = null;
   let retryTimer = null;
 
-  // Exchange the HttpOnly session cookie for a short-lived token (same-origin call).
-  function getToken() {
-    if (!tokenPromise) {
-      tokenPromise = fetch("/api/v1/widget-token", { credentials: "same-origin" }).then(async (resp) => {
-        if (!resp.ok) { tokenPromise = null; throw new Error("widget-token failed: " + resp.status); }
-        const { token } = await resp.json();
-        log("got widget token (" + token.slice(0, 16) + "...)");
-        return token;
-      });
-    }
-    return tokenPromise;
-  }
-
-  // Send the token to the iframe, restricted to the embedded origin.
-  async function sendToken(reason) {
+  // Send the session token the page already holds, restricted to the embedded origin.
+  function sendToken(reason) {
     if (authenticated) return;
-    try {
-      const token = await getToken();
-      iframe.contentWindow.postMessage({ type: "contoso-auth", token }, EMBEDDED_ORIGIN);
-      log("postMessage contoso-auth sent (" + reason + ")");
-    } catch (err) { log(String(err)); }
+    iframe.contentWindow.postMessage({ type: "contoso-auth", token: SESSION_TOKEN }, EMBEDDED_ORIGIN);
+    log("postMessage contoso-auth sent (" + reason + ")");
   }
 
   // The chat UI may not be listening yet when the iframe loads (websocket still connecting),
@@ -90,7 +73,7 @@
     }, 2000);
   }
 
-  iframe.addEventListener("load", () => { authenticated = false; tokenPromise = null; startRetries(); });
+  iframe.addEventListener("load", () => { authenticated = false; startRetries(); });
 
   window.addEventListener("message", (event) => {
     // Accept messages only from the embedded app origin.
@@ -100,7 +83,6 @@
     if (data === "ready" || (data && data.type === "ready")) {
       // A new chat (e.g. "New chat" button) also sends "ready" and needs the token again.
       authenticated = false;
-      tokenPromise = null;
       sendToken("ready");
       startRetries();
     } else if (data && data.type === "contoso-auth-ok") {

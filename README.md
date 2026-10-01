@@ -13,10 +13,10 @@ Each one has its own public domain, so the browser treats them as different orig
 
 ## Flow
 
-1. **Login on the host.** The user logs in on the host page. The host keeps its own session cookie (HttpOnly, so JavaScript cannot read it).
+1. **Login on the host.** The user logs in on the host page. After login the host page holds the storefront session token, as a SPA typically does with its bearer token.
 2. **Iframe loads.** The host page renders an iframe pointing to the Chainlit app.
 3. **Embedded says "ready".** Chainlit starts a chat session and calls `cl.send_window_message("ready")` to the parent window.
-4. **Host sends the credential.** The host page checks `event.origin` and `event.source`, fetches a short-lived token from its own backend (`GET /api/v1/widget-token`, same origin, cookie is sent automatically) and calls `iframe.contentWindow.postMessage({type: "contoso-auth", token}, EMBEDDED_ORIGIN)`.
+4. **Host sends the credential.** The host page checks `event.origin` and `event.source`, takes the session token the page already holds and calls `iframe.contentWindow.postMessage({type: "contoso-auth", token}, EMBEDDED_ORIGIN)`.
 5. **Embedded validates server side.** Chainlit receives the message in `@cl.on_window_message` and calls `GET {HOST_URL}/api/v1/sessions/current` with `Authorization: Bearer <token>`. This is a server to server call, so browser CORS does not apply.
 6. **User context available.** The response (user name, email, billTo, shipTo) is stored in `cl.user_session` and used to answer questions. The embedded page sends `contoso-auth-ok` back to the host.
 
@@ -70,7 +70,6 @@ Clean up: `az group delete -n rg-postmessage-demo`.
 
 This demo is intentionally simplified. For production:
 
-- **Use a dedicated short-lived token.** Issue a signed JWT with `aud`, `iss`, `exp` and `jti` instead of forwarding the store session cookie, and keep it in memory only (never in the URL). See [RFC 7519](https://datatracker.ietf.org/doc/html/rfc7519) and [JWT best practices (RFC 8725)](https://datatracker.ietf.org/doc/html/rfc8725).
 - **Treat postMessage as transport, not authentication.** Always set an explicit `targetOrigin`, check `event.origin` against an allowlist, and do not send sensitive data back to the parent (Chainlit 2.9.x replies with `"*"`). See [MDN: postMessage security](https://developer.mozilla.org/en-US/docs/Web/API/Window/postMessage#security_concerns).
 - **Validate on the server and fail closed.** The backend calls `GET /api/v1/sessions/current` server-to-server (contract TBC) and derives the user, billTo and shipTo only from that response.
 - **Restrict who can frame the chat.** Set CSP [`frame-ancestors`](https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Content-Security-Policy/frame-ancestors) on the embedded app to the store domains only.
