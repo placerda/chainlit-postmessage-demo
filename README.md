@@ -68,20 +68,16 @@ Clean up: `az group delete -n rg-postmessage-demo`.
 
 ## Production recommendations
 
-The demo keeps things simple. These are standard practices for iframe integrations, listed with the team responsible for each one:
+The demo keeps things simple. For production, these standard iframe practices are recommended:
 
-- **Address messages to the right site.** postMessage lets the sender name the recipient, and the receiver check the sender. See [MDN: postMessage](https://developer.mozilla.org/en-US/docs/Web/API/Window/postMessage#security_concerns).
-  - *Host page (Store team):* send the token with the chat address as the target, for example `postMessage(token, "https://<chat-domain>")`.
-  - *Embedded page (Chat team):* accept messages only when `event.origin` is a store domain.
-  - *Embedded page (Chat team):* reply to the store with simple status signals such as "ready" or "auth-ok", not with the token or user data. Chainlit's `send_window_message` does not set a specific target site, so status signals are the right fit for it.
-- **Let the store confirm who the user is.** The chat asks the store's backend, so user data always comes from the store itself.
-  - *Embedded backend (Chat team):* call `GET /api/v1/sessions/current` server-to-server with the token (contract TBC) and read the user, billTo and shipTo from that response. If the call does not succeed, show the sign-in prompt.
-- **Choose which sites can show the chat.** CSP (Content Security Policy) is an HTTP response header that tells the browser how a page may be used. Its [`frame-ancestors`](https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Content-Security-Policy/frame-ancestors) setting lists the sites allowed to display the page in an iframe.
-  - *Embedded app (Chat team):* return `Content-Security-Policy: frame-ancestors https://<store-domain>` (for example, via app middleware or the ingress/gateway).
-  - *Host page (Store team):* no change needed.
-- **Keep sign-out in sync.** When the user signs out of the store, the chat signs out too.
-  - *Host page (Store team):* post a logout message to the iframe.
-  - *Embedded page (Chat team):* clear the chat session on that message.
+| Practice | Store team (host page) | Chat team (chat app) |
+|---|---|---|
+| **Send the token only to the chat** | Send it after the chat says "ready", with the chat address as target: `postMessage(token, "https://<chat-domain>")`. | Accept it only from store domains (check `event.origin`). Send back status signals only, such as "ready" or "auth-ok". |
+| **Confirm the user with the store** | Confirm the session API contract (TBC). | From the backend, call `GET /api/v1/sessions/current` with the token and use the user, billTo and shipTo it returns. If it fails or expires, show the sign-in prompt. |
+| **Show the chat only inside the store** | No change. | Return the header `Content-Security-Policy: frame-ancestors https://<store-domain>`. |
+| **Keep sign-in state in sync** | Post a logout message (or a new token) to the iframe. | Clear the chat session on logout, or switch to the new token. |
+
+Learn more: [postMessage security](https://developer.mozilla.org/en-US/docs/Web/API/Window/postMessage#security_concerns), [CSP frame-ancestors](https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Content-Security-Policy/frame-ancestors).
 
 ## Deployed instance (demo)
 
