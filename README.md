@@ -68,6 +68,8 @@ Clean up: `az group delete -n rg-postmessage-demo`.
 
 ## What this demo simplifies (production items)
 
+The host main page has a collapsible **Production recommendations** section with the full list (credential design, postMessage hardening, server-side validation, iframe session, framing policy, platform and operations). Summary:
+
 - **postMessage is a transport, not authentication.** Anything can post a message to the iframe. Trust comes only from validating the token on the server.
 - **Origin checks.** The host checks `event.origin`. Chainlit 2.9.x forwards any window message without an origin check and replies with target `"*"`, so do not send sensitive data back to the parent.
 - **Real contract TBC.** The real `GET /api/v1/sessions/current` contract on the commerce platform (which credential it accepts, which fields it returns, billTo/shipTo shape) still needs confirmation.
